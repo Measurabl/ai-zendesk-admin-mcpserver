@@ -1,5 +1,4 @@
-import { z } from 'zod';
-    import { zendeskClient } from '../zendesk-client.js';
+import { zendeskClient } from '../zendesk-client.js';
 
     export const talkTools = [
       {

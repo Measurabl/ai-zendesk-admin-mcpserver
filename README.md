@@ -13,7 +13,7 @@
 
     ### Prerequisites
 
-    - Node.js 14 or higher
+    - Node.js 20 or higher
     - A Zendesk account with API access
 
     ### Installation
@@ -41,6 +41,14 @@
     ```
     npm run dev
     ```
+
+    ## Security
+
+    - **Never commit `.env`.** It is git-ignored; real Zendesk credentials must only live in your local copy or in your MCP client config. If a credential is ever committed, rotate it in Zendesk immediately.
+    - **Least privilege.** Create the API token under a Zendesk agent/role with only the permissions the tools you use actually need.
+    - **Read-only mode.** Set `ZENDESK_READ_ONLY=true` to register only read tools (`list_*`, `get_*`, `search`). Strongly recommended when the connected LLM reads untrusted ticket content — prompt injection inside a ticket could otherwise trigger delete/update/trigger-creation tools.
+    - **Destructive tools.** `delete_*` calls and `create_trigger`/`create_automation` (which can auto-notify external targets) are irreversible or high-impact; configure your MCP client to require human approval for them.
+    - **Dependencies are exact-pinned** (`.npmrc` sets `save-exact=true`); install with `npm ci` so the lockfile is authoritative. CI runs ESLint (with security rules), `npm audit`, lockfile integrity checks, CodeQL, dependency review, and gitleaks secret scanning.
 
     ### Testing with MCP Inspector
 
