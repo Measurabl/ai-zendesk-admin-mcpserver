@@ -1,5 +1,4 @@
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
-    import { zendeskClient } from './zendesk-client.js';
     import { ticketsTools } from './tools/tickets.js';
     import { usersTools } from './tools/users.js';
     import { organizationsTools } from './tools/organizations.js';
@@ -38,8 +37,14 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mc
       ...chatTools
     ];
 
+    // Optional guardrail: set ZENDESK_READ_ONLY=true to expose only read tools.
+    // Recommended when the connected LLM processes untrusted ticket content
+    // (prompt injection in a ticket could otherwise invoke delete/update tools).
+    const readOnly = process.env.ZENDESK_READ_ONLY === 'true';
+    const isReadTool = (name) => /^(list_|get_|search)/.test(name);
+
     // Register each tool with the server
-    allTools.forEach(tool => {
+    allTools.filter(tool => !readOnly || isReadTool(tool.name)).forEach(tool => {
       server.tool(
         tool.name,
         tool.schema,
@@ -79,7 +84,7 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mc
           };
         }
 
-        if (docs[section]) {
+        if (Object.prototype.hasOwnProperty.call(docs, section)) {
           return {
             contents: [{
               uri: uri.href,

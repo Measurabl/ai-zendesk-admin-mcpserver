@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: ESLint (incl. security rules)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  dependency-audit:
+    name: npm audit (prod deps, fail on high+)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - run: npm audit --omit=dev --audit-level=high
+
+  lockfile-lint:
+    name: Lockfile integrity (registry + HTTPS + hashes)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Verify all lockfile packages come from npmjs over HTTPS with integrity hashes
+        run: >
+          npx --yes lockfile-lint@5.0.1
+          --path package-lock.json
+          --type npm
+          --allowed-hosts npm
+          --validate-https
+          --validate-integrity
+
+  secret-scan:
+    name: Gitleaks secret scan (full history)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Download and verify gitleaks
+        run: |
+          curl -sSfL -o gitleaks.tgz \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks.tgz" | sha256sum -c -
+          tar -xzf gitleaks.tgz gitleaks
+      - name: Scan repository history for secrets
+        run: ./gitleaks git --redact --no-banner .
+
+  smoke-test:
+    name: Server loads and registers tools
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Import server and count registered tools
+        run: |
+          node -e "
+          import('./src/server.js').then(m => {
+            const n = Object.keys(m.server._registeredTools ?? {}).length;
+            if (n < 40) { console.error('Expected >=40 tools, got', n); process.exit(1); }
+            console.log('OK:', n, 'tools registered');
+            process.exit(0);
+          }).catch(e => { console.error(e); process.exit(1); });
+          "

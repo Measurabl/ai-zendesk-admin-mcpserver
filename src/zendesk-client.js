@@ -26,6 +26,12 @@ import axios from 'axios';
             throw new Error('Zendesk credentials not configured. Please set environment variables.');
           }
 
+          // Prevent URL injection: subdomain must be a plain Zendesk subdomain,
+          // otherwise credentials could be sent to an attacker-controlled host.
+          if (!/^[A-Za-z0-9-]+$/.test(this.subdomain)) {
+            throw new Error('Invalid ZENDESK_SUBDOMAIN: only letters, numbers, and hyphens are allowed.');
+          }
+
           const url = `${this.getBaseUrl()}${endpoint}`;
           const headers = {
             'Authorization': this.getAuthHeader(),
@@ -37,13 +43,19 @@ import axios from 'axios';
             url,
             headers,
             data,
-            params
+            params,
+            timeout: 30000,
+            // Never follow redirects: prevents the Basic auth header from
+            // being replayed to a different host.
+            maxRedirects: 0,
+            maxContentLength: 10 * 1024 * 1024,
+            maxBodyLength: 10 * 1024 * 1024
           });
 
           return response.data;
         } catch (error) {
           if (error.response) {
-            throw new Error(`Zendesk API Error: ${error.response.status} - ${JSON.stringify(error.response.data)}`);
+            throw new Error(`Zendesk API Error: ${error.response.status} - ${JSON.stringify(error.response.data)}`, { cause: error });
           }
           throw error;
         }
