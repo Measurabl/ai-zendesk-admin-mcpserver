@@ -18,7 +18,7 @@
             "audit:prod": "npm audit --omit=dev --audit-level=high"
       },
       "dependencies": {
-            "@modelcontextprotocol/sdk": "1.30.0",
+            "@modelcontextprotocol/sdk": "1.31.0",
             "axios": "1.19.0",
             "dotenv": "16.4.7",
             "zod": "3.25.76"
